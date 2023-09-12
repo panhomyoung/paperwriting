@@ -1,0 +1,577 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{amsbsy,marvosym,caption,threeparttable,subfigure,float,lastpage,lscape,listings}
+\usepackage{eurosym,mathrsfs,fancyhdr,CJK,multicol,indentfirst,color,bm,upgreek,warpcol}
+\usepackage{titlesec}
+\usepackage{epstopdf}
+\usepackage{algpseudocode}
+\usepackage{graphics}
+\usepackage{epsfig}
+\usepackage{tabularx}
+\usepackage[a4paper, total={184mm,239mm}]{geometry}
+\allowdisplaybreaks[3] 				%导入数学公式包的前提下，允许跨页，1，2，3，4表示允许程度，但equation环境不可换页
+\usepackage{bbm} 					%粗体、双线体
+\usepackage{multirow} 				%纵向合并单元格
+\usepackage{booktabs} 				%三线表
+\let\labelindent\relax
+\usepackage{enumitem}				%调整垂直/水平间距/标签样式
+\usepackage{amsthm} 				%定理环境
+\newtheorem{ownlemma}{Lemma} 		%引理
+\newtheorem{owncorollary}{Corollary} 		%推论
+\newtheorem{owndefinition}{Definition}		%定义
+\newtheorem{ownproperty}{Property} 			%性质
+\newtheorem{ownexample}{Example} 			%性质
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\bibliographystyle{IEEEtran}					%引用文献格式
+\usepackage[numbers, sort & compress]{natbib}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+
+\title{SSS: A \underline{S}emi-Tensor Product based Circuit \underline{S}imulation for \underline{S}AT-sweeping
+% \thanks{This work was supported by the National Natural Science Foundation of China under Grants 62274100 and 61871242.}
+}
+% \author{\IEEEauthorblockN{Hongyang Pan, Ruibing Zhang, Yinshui Xia, Lunyao Wang, and Zhufei Chu\IEEEauthorrefmark{1}}
+% \IEEEauthorblockA{Faculty of Electrical Engineering \& Computer Science, Ningbo University, Ningbo, China\\ \IEEEauthorrefmark{1}Email: chuzhufei@nbu.edu.cn}}
+\maketitle
+\vspace{-10em}
+
+\begin{abstract}
+In recent years, circuit simulators and Boolean satisfiability (SAT) solvers have been tightly integrated to provide efficient logic synthesis and verification.
+Circuit simulation can generate highly expressive simulation patterns that can either enumerate or filter out most candidates for synthesis.
+Subsequently, SAT solvers are employed to check those that remain, thereby making the logic synthesis process more efficient.
+This paper introduces a novel circuit simulator of $k$-input lookup table ($k$-LUT) networks, based on semi-tensor product (STP).
+STP-based simulators use computation of logic matrices, the primitives of logic networks, as opposed to relying on bitwise logic operations for simulation of $k$-LUT networks.
+Experimental results show that our STP-based simulator reduces the runtime by an average of 3.9$\times$.
+Furthermore, we integrate this proposed simulator into a SAT-sweeping engine known as SAT sweeper.
+Through a combination of structural hashing, simulation, and SAT queries, SAT sweeper simplifies logic networks by systematically merging graph vertices from input to output.
+To enhance the efficiency, we used STP-based exhaustive simulation, which significantly reduces the number of false equivalence class candidates, thereby improving the computational efficiency by reducing the number of SAT calls required.
+When compared to the SOTA SAT sweeper, our method demonstrates an average runtime reduction of 6.7$\times$.
+\end{abstract}
+
+\begin{IEEEkeywords}
+logic synthesis, semi-tensor product of matrices, simulation, SAT-sweeping
+\end{IEEEkeywords}
+
+\vspace{-2mm}
+
+\setlength{\arraycolsep}{1.5pt}
+\renewcommand\arraystretch{0.5}
+\section{Introduction}
+\label{sec1}
+It is common for logic synthesis and verification applications to integrate the \emph{Boolean satisfiability} (SAT) solver with a random or guided simulator.
+Currently, logic optimization methods often encode problems as SAT problems to enhance optimization quality through the use of efficient SAT solvers, where simulators can assist it in reducing candidates in order to avoid time-consuming satisfiable runs. 
+Additionally, the SAT solver can find a \emph{counter-example} (CE), which the simulator can use to falsify other properties to save future SAT calls~\cite{intro1}.
+There are many applications that take advantage of this integration, such as SAT-sweeping.
+In SAT-sweeping, the simulator can pregenerate a set of simulation patterns for a given Boolean network, most non-equivalence can be effectively eliminated by simply comparing simulation signatures.
+After each satisfiable SAT call, it also simulates each CE immediately in order to disprove as many properties as possible~\cite{intro3,intro4,intro2}.
+
+The efficacy of simulation, encompassing both initial simulation and CE simulation, plays an important role in SAT-sweeping, with the principal aim of minimizing the number of expensive NP-hard SAT solver calls.
+Certain algorithms incorporate partial simulation as a strategy to expedite simulation speed. 
+However, in scenarios where the pattern set is insufficiently expressive, the equivalence classes tend to enlarge, and the refinement via CE may become computationally more expensive.
+In practice, the equivalence class usually contains a few percent of the total gates in a valid merge.
+Ideally, we only need to simulate these gates, which must be simulated, with exhaustive patterns for better runtime.
+
+In this paper, we propose a \emph{$k$-input lookup table} ($k$-LUT) circuit simulator based on \emph{semi-tensor product} (STP).
+Modern circuit simulators support bitwise logic operations, utilizing fast bit-parallel simulation to enhance efficiency. 
+Nonetheless, simulating $k$-LUT networks poses a unique challenge, as it does not readily exploit these bit-parallel capabilities. 
+$k$-LUT simulation must obtain information in turn regarding each simulation pattern by traversing all nodes in a topological order before computing the output values of each node.
+The STP method works by matrices, utilizing logic matrices for the definition of Boolean variables to prove the basic logic properties~\cite{intro6}. 
+As primitives in the logic network, logic matrices, which convert logical reasoning into mathematical computations and preserve topological information between circuits, are used to simulate the $k$-LUT network.
+Motivated by this reasoning, we integrate our STP-based simulator into the SAT-sweeping engine, where efforts are made in order to run as many simulations as possible within the given runtime budget, reducing equivalence classes to avoid unnecessary SAT solver calls.
+
+The main contributions are: (1) a more efficient simulator: compared with other bitwise logic operation based simulation implementations, the STP-based simulator does not require specific logic operators, and the output values of any node can be computed by one matrix pass; 
+(2) The integration of STP-based simulator into SAT sweeper \emph{\&fraig}: we first use SAT-guidance initial simulations to refine equivalence classes while adding the constant node substitution, which can significantly reduce the number of false candidates for merging~\cite{intro7}.
+Then, map the nodes of non-equivalence classes to $k$-LUTs and simulate the nodes of equivalence classes with more simulation pattern to further refine candidate equivalence classes.
+In addition, for the candidate gates to be validated in each valid merge, we consider its \emph{transitive fanin} (TFI) to explore the maximum QoR.
+Experimental results show that the simulator can reduce the runtime by 3.95$\times$ on average, and the SAT sweeper can reduce the runtime by 6.7$\times$ on average.
+
+\vspace{-2mm}
+\section{Preliminaries}
+\label{sec2}
+\subsection{Circuit simulation}
+\label{sec21}
+Circuit simulation involves visiting nodes in topological order and computing output values using their input values.
+The \emph{simulation pattern} is a collection of Boolean values assigned to each \emph{primary input} (PI) of a network.
+Practically, multiple simulation patterns can be consolidated by encoding sequences of Boolean values as machine words, rather than as individual bit. 
+Modern arithmetic logic units are enabling the computation of 32 or 64 patterns for a node within a single CPU instruction.
+The \emph{simulation signature} of a node is an ordered set of values produced at the node under each simulation pattern. 
+If a set of simulation patterns covers all possible combinations of value assignment (a requirement necessitating $2^k$ patterns for $k$ PIs), this set is \emph{exhaustive} and the simulation signatures are also known as \emph{truth tables} (TTs)~\cite{pri1}.
+
+Simulation can be executed either globally across the entire network or locally in a small \emph{window} that called \emph{partial simulation}. 
+$2^{16}$ patterns are already impractical to handle, however, networks typically feature a greater number of primary inputs, often exceeding 16. 
+To use the exhaustive set of patterns, simulation must be restricted to a window encompassing fewer than 16 (typically within the range of 8 to 10) leaf nodes.
+
+\subsection{Semi-Tensor Product of Matrices and Its Logical Reasoning}
+\label{sec22}
+This subsection gives a brief review of the STP computation of matrices.
+We refer the reader to~\cite{pri2,pri21} for more details.
+The real matrices with $m \times n$ dimensions are represented by $M^{m \times n}$.
+Consider two matrices $X \in M^{m \times n}$ and $Y \in M^{p \times q}$, the STP can produce matrices in any dimension.
+
+\begin{owndefinition}
+\label{def1}
+Let $X \in M^{m \times n}$ and $Y \in M^{p \times q}$, the STP of $X$ and $Y$, denoted by $X \ltimes Y$, is defined as
+\begin{center}
+$ X \ltimes Y = (X \otimes I_{t/n}) \cdot (Y \otimes I_{t/p})$,
+\end{center}
+where $\cdot$ represents the common matrix product, $I_n$ represents the identity matrix with dimension $n$, $t$ is the least common multiple of $n$ and $p$, and $\otimes$ is Kronecker product of two arbitrary dimensional matrices~\cite{pri3}.
+\end{owndefinition}
+
+\begin{ownproperty}
+\label{pro1}
+The STP of matrices supports matrix swapping.
+Let $A$ be a matrix with any dimensions, if $Z_r \in M^{1 \times t}$ is a row vector, then $A \ltimes Z_r = Z_r \ltimes (I_t \otimes A)$.
+In contrast, if $Z_c \in M^{t \times 1}$ is a column vector, then $Z_c \ltimes A = (I_t \otimes A) \ltimes Z_c$.
+\end{ownproperty}
+
+The matrix form of logic formulas can be used to describe logic representations in general.
+We refer to the matrix product as the STP in this paper and omit the symbol ``$\ltimes$'' hereinafter.
+First, we denote the set of Boolean variables $\mathbb{B}$.
+\begin{equation}
+\label{eq1}
+\mathbb{B} : \left\{True = \begin{bmatrix} 1 \\ 0 \end{bmatrix} , False =\begin{bmatrix} 0 \\ 1 \end{bmatrix}. \right\}
+\end{equation}
+
+\begin{owndefinition}
+\label{def2}
+A $M^{2 \times 2^n}$ matrix is called a logic matrix if all its columns are elements in $\mathbb{B}$, where logic matrix $M_{\sigma}$ in which columns are consistent with the TT (it is read from right to left) of a logic operation $\sigma$ is called the structural matrix.
+\end{owndefinition}
+
+\begin{ownproperty}
+\label{pro2}
+$a, b \in \mathbb{B}$ and $\sigma$ is an any Boolean operator.
+The structural matrix of unary operator ``\emph{not}'' ($\lnot$) is $M_{\lnot} = \begin{bmatrix} 0 & 1 \\ 1 & 0 \end{bmatrix}$.
+The inversion of variable $a$ can be converted to matrices multiplication as $\bar{a} = M_\lnot a$.
+Similarly, for binary operators, the logic representation can be converted as $a\ \sigma\ b = M_{\sigma} ab$.
+\end{ownproperty}
+
+Therefore, any Boolean function can be converted into its \emph{STP form} by structural matrices, and logic identities can be easily proved using structure matrices of Boolean operators and STP properties.
+
+\begin{ownexample}
+Prove the logic identity $a \rightarrow b = \bar{a} \lor b$ using the STP based computation.
+\begin{proof}
+According to the Property~\ref{pro2}, the STP form of the left hand side is $M_{\rightarrow} ab$, while the right hand side is $M_{\lor} (M_\lnot a)b$.
+\begin{center}
+$M_{\lor} M_\lnot = \begin{bmatrix} 1&1&1&0 \\ 0&0&0&1 \end{bmatrix} \begin{bmatrix} 0&1 \\ 1&0 \end{bmatrix} = \begin{bmatrix} 1&0&1&1 \\ 0&1&0&0 \end{bmatrix} = M_{\rightarrow}$.
+\end{center}
+Hence, the identity holds.
+\end{proof}
+\end{ownexample}
+
+A key aspect of Boolean function manipulation is the \emph{canonical form} (CF), since these functions can be functionally equivalently represented in several different logic realizations. A canonical form is also available for STP.
+
+\begin{ownproperty}
+\label{pro3}
+Any logic expression $\Phi(x_1, \ldots, x_n)$ with Boolean variables $x_1, \ldots, x_n \in \mathbb{B} $ can be computed into a canonical form $M_{\Phi}$ as
+\begin{center}
+$ \Phi(x_1, \ldots, x_n) = M_{\Phi} x_1 \ldots x_n$,
+\end{center}
+where $M_{\Phi} \in  M^{2 \times 2^n}$.
+\end{ownproperty}
+
+We use an example to explain the STP computation process.
+
+\begin{ownexample}
+There are three persons $a$, $b$, and $c$. They are either honest or liar, suppose a liar always said a lie and the honest man always told the truth.
+Person $a$ said that person $b$ is a liar, person $b$ said person $c$ is a liar, and person $c$ said that both $a$ and $b$ are liars. Who is/are the liar(s)?
+
+First, we define logic variable $a$ to indicate person $a$ is honest. 
+Thus $\bar a$ means $a$ is a liar. 
+The definitions also work for Boolean variables $b$ and $c$.
+The statements result in the logic expression
+\begin{equation}
+\label{liar}
+\Phi(a, b, c) = (a \leftrightarrow \bar b) \land (b \leftrightarrow \bar c) \land (c \leftrightarrow \bar a \land \bar b).
+\end{equation}
+The STP form of~\eqref{liar} is
+\begin{center}
+  $\Phi = M_{\land}^{2}(M_{\leftrightarrow} a M_\lnot b)(M_{\leftrightarrow} b M_\lnot c)(M_{\leftrightarrow} c M_{\land} M_\lnot a M_\lnot b)$.
+\end{center}
+Then, converting the STP form of logic expression into the canonical form $M_{\Phi}$ as
+\begin{center}
+    $\Phi(a, b, c)  = M_{\Phi}abc  = \begin{bmatrix} 0&0&0&0&0&1&0&0 \\ 1&1&1&1&1&0&1&1  \end{bmatrix} abc.$
+\end{center}
+
+If we assume the simulation pattern is 010, that is, $b$ is honest, $a$ and $c$ are liars,
+\begin{center}
+$a =\begin{bmatrix} 0 \\ 1  \end{bmatrix} , b =\begin{bmatrix} 1 \\ 0  \end{bmatrix} , c =\begin{bmatrix} 0 \\ 1  \end{bmatrix}.$
+\end{center}
+The STP form $\Phi(a, b, c)$ can be computed, i.e., simulated as 
+\begin{align}
+  \Phi(a, b, c) & = \begin{bmatrix} 0&0&0&0&0&1&0&0 \\ 1&1&1&1&1&0&1&1  \end{bmatrix} \begin{bmatrix} 0 \\ 1  \end{bmatrix}\begin{bmatrix} 1 \\ 0  \end{bmatrix}\begin{bmatrix} 0 \\ 1  \end{bmatrix} \notag  \\
+                & = \begin{bmatrix} 0&1&0&0 \\ 1&0&1&1  \end{bmatrix} \begin{bmatrix} 1 \\ 0  \end{bmatrix}\begin{bmatrix} 0 \\ 1  \end{bmatrix} \notag \\
+                & = \begin{bmatrix} 0&1 \\ 1&0  \end{bmatrix} \begin{bmatrix} 0 \\ 1  \end{bmatrix} = \begin{bmatrix} 1 \\ 0  \end{bmatrix}.  \notag
+\end{align}
+\end{ownexample}
+
+\subsection{SAT-sweeping}
+\label{sec23}
+SAT-sweeping is an engine that detects, proves, and merges (or collects) functionally equivalent nodes (up to complementation). 
+In SAT-sweeping, two nodes are checked if they can be merged using SAT~\cite{pri4,sweep2}. 
+SAT solvers provide a CE in the event the nodes cannot be merged, which is an input assignment that allows the two gates to be simulated to have different values.
+A traditional implementation of SAT-sweeping would test all possible pairs of nodes.
+In order to alleviate this problem, simulation is extensively used in SAT-sweeping in order to reduce the number of calls to the SAT solver.
+Using initial random simulations, nodes can be grouped into equivalence classes, that is, classes of nodes that always simulate to the same value.
+In this case, only calls to SAT are required to prove, or disprove, equivalencies between gates belonging to the same class.
+As a result, the number of SAT queries has already been drastically reduced~\cite{sweep1}. 
+
+\vspace{-2mm}
+\section{STP-based circuit simulator}
+\label{sec3}
+In this section, we propose a STP-based simulation of $k$-LUT networks.
+In modern simulator, the key aspect of simulating $k$-LUTs is applying bitwise logic operations efficiently. 
+A $k$-LUT takes $k$-input bits, and the simulator applies bitwise logic operations to its input signals, simulates the behavior by a predefined TT of LUTs.
+However, these bitwise operations (AND, OR, XOR, and NOT) can not provide efficient support for $k$-LUT networks, making simulation slower.
+When it comes to STP, any Boolean function can be easily converted into its $k$-LUT network (bitwise operation is 2-LUT) represented by matrices, and the simulation is actually matrix multiplication.
+
+\subsection{Circuit Simulation Algorithm}
+\label{sec31}
+The STP-based simulator can simulate all nodes or some specified nodes.
+The former visits all nodes in topological order, while the latter use the cut algorithm in Section~\ref{sec33} to map these nodes which do not simulated into $k$-LUT. 
+
+The algorithm is shown in Algorithm~\ref{algo1}.
+The input of the algorithm is a $k$-LUT network \emph{K}, a simulation pattern set \emph{P} and the simulation mode \emph{m}.
+The simulation mode contains all node simulation ($a$) or specified node simulation ($s$).
+The output is the obtained simulation signature \emph{S} according to the choice of \emph{m}.
+If the chosen mode is $a$, the simulator will visit all nodes in the network in a topological order and use their input value to compute the output value by matrices multiplication(line 2).
+Otherwise, when we only need to get the simulation signature of specified nodes, we perform the simulation by following the steps below.
+First, we compute the size \emph{limit} of a cut based on the number of simulation patterns.
+Because it also takes time to compute the TT of cuts, this ensures that the STP method is more efficient than direct simulation(line 4).
+Second, we take nodes in $s$ and \emph{limit} as the boundary to cut \emph{K}, so that each cut is a tree structure with leaf node no larger than \emph{limit}, and the root node of each cut is stored in \emph{root} set(line 5).
+Then, we use the STP-based matrices multiplication to compute the TT of all cuts in the \emph{root} set(line 6).
+Finally, each cut node in the root collection is accessed in topological order and its output is computed based on the input value(line 7).
+The algorithm returns the desired simulation signatures.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{algorithm}[t]
+  \SetAlgoLined
+  \LinesNumbered %要求显示行号
+  \caption{STP-based circuit simulation}
+  \label{algo1}
+  \KwIn{logic network \emph{K}, simulation pattern \emph{P}, \emph{m}(all nodes \emph{a} or specified nodes \emph{s})}%输入参数
+  \KwOut{simulation signature(\emph{S})}%输出
+  \eIf{m == $a$}{
+    $S \leftarrow$ sim\_all\_nodes($K,P$)\;
+    \textbf{return} $S_a$\;
+  }{
+    $n \leftarrow P$.size(), \emph{limit}=\emph{log(n)} \; 
+    $root \leftarrow$ circuit\_cut($K,limit,s$)\;
+    STP\_matrices\_multiplication($K,root$)\;
+    $S \leftarrow$sim\_nodes($K,P$)\;
+    \textbf{return} $S_s$\;
+  }
+\end{algorithm}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Cut Algorithm}
+\label{sec33}
+The conventional method of circuit simulation involves a traversal of all nodes in the circuit, following a topological order, and computing their output values based on input values. 
+However, this method becomes redundant when our objective is to obtain the simulation signature for specific nodes, rather than all nodes.
+To address this issue, we introduce a novel cut algorithm designed to minimize the number of intermediate nodes that require simulation. 
+This optimization enables us to swiftly obtain the simulation signatures of the nodes of interest.
+
+Consider a scenario where a node possesses multiple fan-out connections, totaling $n$ in number. 
+In the context of simulating all nodes, this specific node is accessed a total of $n+1$ times: once for computing its output and $n$ additional times for extracting its value.
+By mapping these multiple fan-out nodes into a $k$-LUT, we effectively reduce unnecessary accesses. 
+Consequently, we employ the STP to compute the TTs for each defined cut, employing nodes requiring simulation as the boundary. This strategic approach allows the simulator to efficiently acquire the desired node's value while incurring minimal computational overhead.
+
+\subsection{Example}
+\label{sec34}
+Here we get a DAG which havs five PIs ($1, 2, 3, 4, 5$) and two POs ($po1, po2$), as shown in Fig.~\ref{fig:sim1}.
+There are six intermediate nodes in the circuit, and each intermediate node records its TT. 
+For example, the node ``6'' has two inputs ``1'' and ``3'' and one output ``10'', where the TT ``0111'' indicates that when the two inputs are assigned values according to the sequence, respectively ``11'', ``10'', ``01'', ``00'', the corresponding values of the output are ``0'', ``1'', ``1'', ``1'', that is, 2-input NAND.
+
+Assume that there are 10 simulation patterns as
+\begin{center}
+$01110010111010011011111001100000000111111010000101,$
+\end{center}
+where the combination formed by taking out the $i$-th bit of each input represents the $i$-th simulation pattern.
+For example, the first simulation pattern is ``01100''.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[t]
+  \centering  %图片全局居中
+  \subfigbottomskip=-4pt %两行子图之间的行间距
+  \subfigcapskip=-5pt %设置子图与子标题之间的距离
+  \subfigure[example logic circuit]{
+      \label{fig:sim1}
+      \includegraphics[width=0.25\textwidth]{picture/sim1.pdf}}
+      \hspace{15mm}
+  \subfigure[cutting algorithm]{
+      \label{fig:sim2}
+      \includegraphics[width=0.25\textwidth]{picture/sim2.pdf}}
+  \caption{Illustration of STP-based simulation}
+  \label{fig:sim}
+  \vspace{-2mm}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+Next we simulate and only get the simulation signature of POs.
+Firstly, we must identify multiple fan-out nodes; in this context, nodes ``7'' and ``8'' fall under this category.
+Secondly, we need to find the cut that satisfies the leaf node restriction. 
+Since $3 < log_2^{10} < 4$, we set a limit of 3, meaning that each cut's input count should not exceed 3.
+After cutting, we derive four distinct cuts: (6,10), (7), (8), and (9,11). 
+For each cut, we proceed to compute its TT, as illustrated in Fig.~\ref{fig:sim2}.
+Finally, all nodes of the root set are sorted according to the inverse topology order of the graph. 
+We sequentially traverse and simulate each node within this sorted root set, ultimately leading to the acquisition of simulation signatures.
+As an example, node ``7'' has two inputs, namely ``3'' and ``4''.
+By combining patterns of inputs with the TT of node ``7'' (0111), we successfully compute the simulation signature of node ``7'' as follows: 7: 1111100111.
+
+\vspace{-2mm}
+\section{STP-based SAT-sweeping framework}
+\label{sec4}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{algorithm}[t]
+  \SetAlgoLined
+  \LinesNumbered %要求显示行号
+  \caption{STP-based SAT-sweeping algorithm}
+  \label{algo2}
+  \KwIn{Network $N$, number $n$}%输入参数
+  \KwOut{Optimized network $N'$}%输出
+  $n \leftarrow 1000$ \;
+  $S_e,S_c \leftarrow$ SAT\_guided\_simulation\_patterns($N$)\;
+  \emph{class} $\leftarrow$ constant\_prop($N,S_c$), init\_equiv\_class($N,S_e$)\;
+  \emph{list}  $\leftarrow$ inverse\_topo\_sort($N$)\;
+  \ForEach{gate $G_i \in$ \emph{list} }{
+    candidate = $G_i$\;
+    \If{skip(candidate)}{
+        \textbf{continue} \;
+    }
+    \emph{class\_new} = \emph{class}($G_i$) $\bigcup$ (INV + \emph{class}($\bar{G_i}$))\;
+    sort\_topo\_order(\emph{class\_new}) \;
+    \ForEach{gate $G_j \in$ \emph{class\_new}}{
+        \ForEach{$G_k \in$ transitive\_fanin($G_j,n$)}{
+            driver = $G_k$\;
+            \If{skip(driver, candidate)}{
+                \textbf{continue} \;
+            }
+            eq = SAT(candidate $\oplus$ driver)\;
+            \If{eq == unDET}{
+                mark\_dont\_touch(candidate)\;
+                \textbf{break} \;
+            }   
+            \eIf{eq == unSAT}{
+                $N' \leftarrow$ substitute\_node($G_j$, candidate)\;
+            }{
+                CE $\leftarrow$ SAT\;
+                STP\_simulation($N$)\;
+                refine\_equiv\_class(CE, class\_new, $N$)\;
+            }
+        }
+    }
+  }
+  \textbf{return} $N'$\;
+\end{algorithm}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+In this section, we integrate our STP-based simulator into the SAT-sweeping framework, as depicted in Fig.~\ref{fig:system}, and the algorithm is delineated in Algorithm~\ref{algo2}.
+In essence, our STP-based simulator accomplishes exhaustive simulation by employing circuit cut algorithm and focusing exclusively on simulating nodes within equivalence classes.
+For the SAT solver, we utilize a circuit-based SAT solver to direct access to the network~\cite{sweep3}.
+
+As for details, we set the upper limit for the number of nodes that can be compared within the TFI to 1000 (line 1). 
+Simulation patterns are initially generated using SAT-guided initial pattern algorithms (line 2).
+These high-quality simulation patterns serve as the foundation for computing equivalence classes, accounting for complementation, and executing the propagation of constant nodes for substitution (line 3).
+Next, we arrange the list of gates that require processing in a reverse topological order, effectively traversing the circuit from primary outputs to primary inputs (line 4). 
+Subsequently, we address the sorted gates in sequence. 
+The gate presently under consideration is denoted as \emph{candidate}, as it is a potential candidate for removal and replacement with a preceding gate in the topological order (line 6).
+To expedite the process, we promptly examine whether the current candidate should be skipped by checking for \emph{don't touch} conditions (lines 7-9). 
+We treat equivalence classes for both positive and negative polarity as a single class, subsequently organizing this general class topologically (lines 10-11).
+To maximize the QoR, we consider the TFI cones of each candidate to identify opportunities for valid merges (lines 12-13). 
+As each member of the generalized equivalence class is attempted for a merge, it is called \emph{driver} (line 14).
+Furthermore, it is essential to verify the conditions of \emph{drivers} (lines 15-17).
+The equivalence problem is translated into \emph{Conjunctive Normal Form} (CNF) and submitted for resolution to the SAT solver (line 18). 
+In the event that the solution is \emph{unDET}, signifying an undetermined outcome, the \emph{candidate} is marked as \emph{don't touch}.
+This designation greatly enhances runtime speed and scalability. 
+Subsequently, when we receive the \emph{unSAT}, we proceed with node substitution by connecting the fanins of the \emph{candidate} fanouts to the driver.
+Upon receiving the \emph{SAT}, we retrieve the CE from the solver, employ the STP-based simulator to propagate the CE, and subsequently refine the equivalence classes based on this information. 
+At the conclusion of this procedure, any dead nodes are eliminated from consideration.
+
+\subsection{Refinement using STP-based Simulation}
+\label{sec41}
+A two-round SAT-guided simulation is first employed to perform tasks such as engine allocation, computation of candidate equivalence classes, and the substitution of constant nodes. 
+The first round simulation is to ensure that gates exhibit simulation signatures characterized by either all zeros or all ones, which helps reduce network complexity through efficient constant propagation. 
+Additionally, the second round simulation aims to avoid gates with only a few ones and the rest zeros, that is, simulation signatures with a high toggle rate\footnote{the toggle rate is the ratio of bit-toggles over the bit-string length.}.
+The constraints on the characteristics of simulation patterns can be efficiently formulated as a SAT problem.
+When the SAT problem is satisfied, new assignments will be generated at the PIs which satisfy the set of constraints~\cite{intro7}.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{figure}[h]
+  \begin{center}
+  \includegraphics[width=0.45\textwidth]{picture/system.pdf}
+  \caption{The proposed ecosystem.} 
+  \label{fig:system}
+  \end{center}
+\end{figure}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\vspace{-4mm}
+
+Moreover, CE-based simulation has been employed for the purpose of refining candidate equivalence classes. 
+However, due to the impractical time demands of simulations, they often rely on partial simulation patterns.
+To further enhance the refinement of candidate equivalence classes, STP-based simulation exclusively visits nodes belonging to the same equivalence class. 
+For instance, if an equivalence class comprises only two nodes, ``A'' and ``B'', we map the remaining nodes into $k$-LUTs, and then simulate the values of ``A'' and ``B'' to disprove their equivalence.
+Furthermore, during the simulation of each CE, we transform nodes not within equivalence classes into $k$-LUTs. 
+We then employ the values assigned to candidate nodes to refine the equivalence classes. 
+In contrast to traditional simulations, STP-based simulations adopt exhaustive simulation patterns, propagating one pattern at a time.
+In terms of practical implementation, the ID of the equivalence class is stored as an integer array within the \emph{equivalence class manager}.
+This information is utilized by the STP-based simulator to exclusively simulate nodes belonging to the same equivalence class, while the remainder are mapped to $k$-LUTs.
+
+\vspace{-2mm}
+\section{Experimental results}
+\label{sec6}
+This section shows the effectiveness of the proposed circuit simulator and corresponding SAT-sweeping algorithm.
+The proposed simulator is implemented in C++ on top of the logic synthesis framework ALSO\footnote{Chu Z. ALSO: Advanced logic synthesis and optimization tool. https://github.com/nbulsi/also, 2022.}, in which the source codes are publicly available. 
+All experiments are performed on a 3.20 GHz Apple M1 CPU with 8GB of main memory.
+
+\subsection{Simulation}
+\label{sec61}
+First, we evaluate the efficiency of our proposed STP-based simulator on the EPFL benchmarks suite\footnote{EPFL benchmark suite, https://github.com/lsils/benchmarks} by command `\texttt{sim}' in ALSO.
+We compare our proposed simulator (\emph{STP}) with the logic circuit simulation (\emph{Mockturtle}~\cite{exp0}).
+Each benchmark is simulated with randomly generated $10^6$ simulation patterns.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{table}[h]
+	\centering
+	\caption{Circuit simulation results for EPFL benchmarks.}
+  \label{tab1}
+	\begin{tabular*}{\hsize}{@{}@{\extracolsep{\fill}}lrrrrrr@{}}
+    \toprule
+		\multirow{2}{*}{Benchmark} & \multicolumn{2}{c}{\emph{Mockturtle}} & \multicolumn{4}{c}{\emph{STP}} \cr
+    \cmidrule(l){2-3} \cmidrule(l){4-7}
+    & $T_A$(s) & $T_L$(s) & $T_A$(s) & \texttt{x} & $T_L$(s) & \texttt{x} \cr
+    \midrule
+    adder      & 2.42  & 2.68  & 2.22  & 1.09  & 0.61  & 4.39   \\ 
+    bar        & 6.52  & 13.91  & 6.86  & 0.95  & 3.04  & 4.58   \\ 
+    div        & 119.25  & 180.56  & 114.41  & 1.04  & 41.79  & 4.32   \\ 
+    hyp        & 427.01  & 667.61  & 429.67  & 0.99  & 181.49  & 3.68   \\ 
+    log2       & 61.63  & 109.89  & 63.59  & 0.97  & 27.99  & 3.93   \\ 
+    max        & 6.36  & 10.88  & 5.90  & 1.08  & 2.28  & {\bf 4.77}   \\ 
+    multiplier & 52.73  & 94.32  & 54.11  & 0.97  & 22.36  & 4.22   \\ 
+    sin        & 10.43  & 18.85  & 10.80  & 0.97  & 4.35  & 4.33   \\ 
+    sqrt       & 49.34  & 81.35  & 49.01  & 1.01  & 18.45  & 4.41   \\ 
+    square     & 36.39  & 63.37  & 36.96  & 0.98  & 15.07  & 4.21   \\ 
+    voter      & 29.19  & 41.61  & 27.38  & 1.07  & 10.39  & 4.00   \\ 
+    router     & 0.58  & 1.06  & 0.51  & 1.14  & 0.29  & 3.66   \\ 
+    priority   & 2.15  & 4.42  & 1.96  & 1.10  & 1.24  & 3.56   \\ 
+    mem\_ctrl  & 92.87  & 203.26  & 95.08  & 0.98  & 54.79  & 3.71   \\ 
+    int2float  & 0.51  & 1.06  & 0.52  & 0.98  & 0.26  & 4.08   \\ 
+    i2c        & 2.78  & 5.65  & 2.89  & 0.96  & 1.48  & 3.82   \\ 
+    dec        & 0.52  & 1.54  & 1.01  & 0.51  & 0.54  & 2.85   \\ 
+    ctrl       & 0.35  & 0.61  & 0.38  & 0.92  & 0.17  & 3.59   \\ 
+    cavlc      & 1.36  & 3.04  & 1.39  & 0.98  & 0.78  & 3.90   \\ 
+    arbiter    & 22.70  & 47.41  & 23.66  & 0.96  & 13.31  & 3.56   \\ 
+  \midrule
+  {\bf Geo.}&8.83  &{\bf 16.22}   &9.09  &     &{\bf 4.10}  &      \\ 
+  {\bf Imp.}   &1.0   &1.0    &0.97  &     &{\bf 3.95}&   \\ 
+  \bottomrule
+	\end{tabular*}
+  \begin{tablenotes}
+    \footnotesize
+    \item[1] Imp. : Average Geometric Mean Improvement (old/new).
+  \end{tablenotes}
+\end{table}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{table*}[t]
+  \centering
+  \fontsize{9}{10}\selectfont
+  \begin{threeparttable}
+  \caption{Comparing the number of SAT calls and the runtime of the SAT sweepers (runtime in seconds)}
+  \label{tab2}
+  \begin{tabular*}{\hsize}{@{}@{\extracolsep{\fill}}lcrrrrrrrrrr@{}}
+  \toprule
+  \multirow{2}{*}{Benchmark} & \multicolumn{4}{c}{Statistics} & \multicolumn{2}{c}{SAT calls} & \multicolumn{2}{c}{Simulation} & \multicolumn{3}{c}{Total runtime} \cr
+  \cmidrule(l){2-5} \cmidrule(l){6-7} \cmidrule(l){8-9} \cmidrule(l){10-12} 
+  & PI/PO & Gate & Lev & Result & \&fraig & STP & \&fraig & STP & \&fraig & STP & \texttt{x}  \\ 
+  \midrule
+  6s100 & 127138/97599 & 636637  & 79  & 627550  & 2400  & 160  & 0.30  & 0.84  & 1.73  & 1.67  & 1.03   \\ 
+  6s20 & 250/202 & 30251  & 2828  & 12741  & 791  & 45  & 0.08  & 0.15  & 33.35  & 24.80  & 1.34   \\ 
+  6s281b35 & 268334/177236 & 2076248  & 121  & 2058408  & 10908  & 779  & 2.69  & 8.07  & 6.84  & 2.87  & 2.38   \\ 
+  6s299b685 & 719410/467370 & 4111296  & 75  & 3809686  & 943  & 99  & 4.78  & 12.75  & 20.56  & 3.48  & 5.90   \\ 
+  6s350rb35 & 245680/243400 & 1550409  & 194  & 1545664  & 106  & 30  & 0.88  & 0.88  & 2.21  & 0.08  & 29.00   \\ 
+  6s382r & 106395/104831 & 1756654  & 2752  & 1704409  & 1158  & 106  & 1.87  & 5.24  & 86.36  & 28.92  & 2.99   \\ 
+  beemfwt4b1 & 3851/1595 & 47368  & 1212  & 41580  & 1009  & 45  & 0.28  & 2.80  & 16.28  & 1.66  & 9.83   \\ 
+  beemfwt5b3 & 7370/3047 & 104771  & 2235  & 90611  & 3303  & 1652  & 1.63  & 1.63  & 37.25  & 2.19  & 17.00   \\ 
+  bobsyntheric2 & 400/201 & 19824  & 4762  & 10776  & 243  & 16  & 0.09  & 0.09  & 11.49  & 0.15  & 79.00   \\ 
+  oski15a07b0s & 8640/4454 & 120268  & 3822  & 118728  & 3812  & 332  & 2.47  & 0.04  & 17.06  & 0.57  & 29.75   \\ 
+  oski2b1i & 26489/13254  & 176605  & 12340  & 176553  & 12073  & 2656  & 10.90  & 27.25  & 105.72  & 17.89  & 5.91   \\ 
+  pj2002 & 2418/1176 & 34333  & 701  & 20526  & 102  & 9  & 0.05  & 0.13  & 6.39  & 2.57  & 2.49  \\ 
+  \midrule
+  {\bf Geo.} & ~ & 237,477  &   & 194,246 & 1,202 & 127 & 0.74 & 1.12  & 14.95  & 2.20  &   \\ 
+  {\bf Imp.} & ~ & ~ & ~ & ~ & 1.0 & {\bf 0.11} & 1.0 & {\bf 1.50} & 1.0  & {\bf 0.15}  &   \\ 
+  \bottomrule
+  \end{tabular*}
+  \begin{tablenotes}
+    \footnotesize
+    \item[1] Imp. : Average Geometric Mean Improvement (old/new).
+    \end{tablenotes}
+  \end{threeparttable}
+  \end{table*}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The experimental results, as summarized in Table~\ref{tab1}, provide valuable insights. 
+To facilitate comparison, we present the mean simulation time for both the \emph{And-Inverter Graph} (AIG), denoted as ``$T_A$'', and the $4$-LUT networks, denoted as ``$T_L$''. 
+Additionally, we quantify the extent of CPU time acceleration as ``$\texttt{x}$''.
+To gauge algorithm efficiency, we utilize the geometric mean, denoted as ``{\bf Geo.}'', and the average geometric mean improvement of optimized simulation over initialization, expressed as ``{\bf Imp.}''. 
+It is evident that there is a preference for algorithms capable of achieving superior benchmark simulation times.
+In terms of ``$T_A$'', our method demonstrates runtime performance comparable to that of \emph{Mockturtle}, which highlights the effectiveness of our method in simulating common data structures.
+For ``$T_L$'', the \emph{STP} exhibits an average runtime improvement of 3.95$\times$ (4.77$\times$ maximum). 
+These findings underscore the enhanced performance of our proposed simulator in the context of $k$-LUT simulation.
+This advantage arises because \emph{Mockturtle} employs incremental simulation, which accelerates simulation by selectively re-simulating necessary nodes and re-computing only the last block of TT. 
+However, it currently lacks support for $k$-LUT simulation. 
+In $k$-LUT simulation, most simulators are limited to extracting individual bits of the LUT and simulating them separately.
+
+\subsection{SAT-sweeping}
+\label{sec62}
+We implemented our method to demonstrate the effectiveness of the STP-based SAT sweeper. 
+To ensure functional correctness, all results were verified using the `\texttt{\&cec}' command in ABC\footnote{Mishchenko A. ABC: System for sequential logic synthesis and formal verification. https://github.com/berkeley-abc/abc, 2022}. 
+Our experiments were conducted using a selected subset of benchmarks from the HWMCC'15~\cite{exp1} benchmark suites.
+The proposed SAT sweeper is based on existing engine, \emph{\&fraig} (command `\texttt{\&fraig -x}' in ABC). 
+As of our knowledge, \emph{\&fraig} represents the most efficient and scalable publicly available SAT sweeper.
+
+As shown in Table~\ref{tab2}, we present the number of PIs and POs, internal AND-nodes in the original AIG (Gate), logic levels (Lev), and the internal AND-nodes after SAT-sweeping (Result) in the ``Statistics'' section.
+Notably, the number of Result remains consistent across both engines since they start from the same AIG, with the SAT solver conflict limit disabled in all runs.
+In ``SAT calls'' and ``Simulation'' sections, we detail the number of satisfiable calls and the respective simulation runtimes. 
+The runtime for simulation primarily encompasses initial simulation and CE-based simulation.
+Lastly, the ``Total runtime'' section provides a direct comparison of the SAT sweeper's overall runtime, revealing a substantial 6.7$\times$ reduction when compared to \emph{\&fraig}. 
+While \emph{\&fraig} invests runtime resources in high-quality initial simulation, our method combines high-quality initial simulations with a $k$-LUT based simulator. 
+We exhibit a 1.5$\times$ increase in simulation time, However, this is offset by a remarkable reduction of 9.1$\times$ in the number of SAT calls.
+This hybrid approach not only improves the quality of simulation patterns but also dramatically reduces the number of satisfiable SAT calls, ultimately resulting in highly efficient CE-based simulations.
+
+\vspace{-2mm}
+\section{Conclusion}
+\label{sec7}
+In this paper, we introduce a novel STP-based circuit simulation tailored for SAT-sweeping. 
+Simulating $k$-LUT networks can be particularly challenging for conventional fast bitwise simulators available off-the-shelf. 
+STP, however, provides advantages in the computation of logic matrices and circuit connectivity.
+The primary contribution of this paper lies in the introduction of cut algorithm that substantially enhances simulation speed and promotes efficient information reuse. 
+When compared to the SOTA simulator, our STP-based simulation demonstrates an average reduction in CPU time by an average of 3.95$\times$.
+Moreover, our simulation approach is deeply integrated into the SAT sweeper, leading to substantial reductions in runtime for refining equivalence classes. 
+Consequently, the implemented SAT sweeping approach, on average, performs 6.7$\times$ faster, without compromising quality.
+
+\footnotesize
+\begin{thebibliography}{00}
+    \bibitem{intro1} Mishchenko A, Brayton R. ``Integrating an AIG package, simulator, and SAT solver,'' in \emph{Proc.IWLS}, 2018: 11-16.
+    \bibitem{intro3} Mishchenko A, Chatterjee S, Brayton R, et al. ``Improvements to combinational equivalence checking,'' in \emph{Proc.ICCAD}, 2006: 836-843.
+    \bibitem{intro4} Zhu Q, Kitchen N, Kuehlmann A, et al. ``SAT sweeping with local observability don't-cares,'' in \emph{Proc.DAC}, 2006: 229-234.
+    \bibitem{intro2} Zhang H T, Jiang J H R, Amarú L, et al. ``Deep integration of circuit simulator and SAT solver,'' in \emph{Proc.DAC}, 2021: 877-882.
+    \bibitem{intro6} Cheng D, Qi H, Xue A. ``A Survey on Semi-Tensor Product of Matrices,'' in \emph{Journal of Systems Science Complexity}, 2007, 20: 304-322.
+    \bibitem{intro7} Amarú L, Marranghello F, Testa E, et al. ``SAT-sweeping enhanced for logic synthesis,'' in \emph{Proc.DAC}, 2020: 1-6.
+    \bibitem{pri1} Lee SY, Riener H, Mishchenko A, et al. ``A simulation-guided paradigm for logic synthesis and verification,'' \emph{IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems}, 2021, 41(8): 2573-2586.
+    \bibitem{pri2} Cheng D, Qi H, Zhao Y. ``An introduction to semi-tensor product of matrices and its applications,'' \emph{World Scientific}, 2012.
+    \bibitem{pri21} Pan HY and Chu ZF, ``Exact Synthesis Based on Semi-Tensor Product Circuit Solver,'' in \emph{Proc.DATE}, 2023, pp. 1-6, doi: 10.23919/DATE56975.2023.10137287.
+    \bibitem{pri3} Van Loan C F. ``The ubiquitous Kronecker product,'' \emph{Journal of computational and applied mathematics}, 2000, 123(1-2): 85-100.
+    \bibitem{pri4} Mishchenko A, Chatterjee S, Jiang R, et al. ``FRAIGs: A unifying representation for logic synthesis and verification,'' \emph{ERL Technical Report}, 2005.
+    \bibitem{sweep2} Mishchenko A, Zhang J S, Sinha S, et al. ``Using simulation and satisfiability to compute flexibilities in Boolean networks,'' \emph{IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems}, 2006, 25(5): 743-755.
+    \bibitem{sweep1} Lu F, Wang L C, Cheng K T, et al. ``A circuit SAT solver with signal correlation guided learning,'' in \emph{Proc.DATE}, 2003: 892-897.
+    \bibitem{sweep3} Zhang H T, Jiang J H R, Mishchenko A. ``A circuit-based SAT solver for logic synthesis,'' in \emph{Proc.ICCAD}, 2021: 1-6.
+    \bibitem{exp0} Siang-Yun  L. mockturtle: a head-only library for logic synthesis and logic optimization, https://github.com/lsils/mockturtle.
+    \bibitem{exp1} HWMCC'15 benchmarks https://fmv.jku.at/hwmcc15/.
+\end{thebibliography}
+
+\end{document}
