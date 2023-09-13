@@ -88,7 +88,7 @@ Motivated by this reasoning, we integrate our STP-based simulator into the SAT-s
 
 The main contributions are: (1) a more efficient simulator: compared with other bitwise logic operation based simulation implementations, the STP-based simulator does not require specific logic operators, and the output values of any node can be computed by one matrix pass; 
 (2) the integration of STP-based simulator into SAT sweeper \emph{\&fraig}: we first use SAT-guidance initial simulations to refine equivalence classes while adding the constant node substitution, which can significantly reduce the number of false candidates for merging~\cite{intro7}.
-Then, map the nodes of non-equivalence classes to $k$-LUTs and simulate the nodes of equivalence classes with more simulation pattern to further refine candidate equivalence classes.
+Then, map the nodes of non-equivalence classes to $k$-LUTs and simulate the nodes of equivalence classes with exhaustive simulation pattern to further refine candidate equivalence classes.
 In addition, for the candidate gates to be validated in each valid merge, we consider its \emph{transitive fanin} (TFI) to explore the maximum QoR.
 Experimental results show that the simulator can reduce the runtime by 7.18$\times$ on average, and the SAT sweeper can reduce the runtime by 35\% on average.
 
@@ -275,12 +275,13 @@ The algorithm returns the desired simulation signatures.
 The conventional method of circuit simulation involves a traversal of all nodes in the circuit, following a topological order, and computing their output values based on input values. 
 However, this method becomes redundant when our objective is to obtain the simulation signature for specific nodes, rather than all nodes.
 To address this issue, we introduce a novel cut algorithm designed to minimize the number of intermediate nodes that require simulation. 
-This optimization enables us to swiftly obtain the simulation signatures of the nodes of interest.
+This optimization reduces the scale of the simulation pattern (including only the PI of specific nodes), enables us to swiftly obtain the simulation signatures of these nodes using exhaustive patterns.
 
 Consider a scenario where a node possesses multiple fan-out connections, totaling $n$ in number. 
 In the context of simulating all nodes, this specific node is accessed a total of $n+1$ times: once for computing its output and $n$ additional times for extracting its value.
 By mapping these multiple fan-out nodes into a $k$-LUT, we effectively reduce unnecessary accesses. 
-Consequently, we employ the STP to compute the TTs for each defined cut, employing nodes requiring simulation as the boundary. This strategic approach allows the simulator to efficiently acquire the desired node's value while incurring minimal computational overhead.
+Consequently, we employ the STP to compute the TTs for each defined cut, employing nodes requiring simulation as the boundary. 
+This strategic approach allows the simulator to efficiently acquire the desired node's value while incurring minimal computational overhead.
 
 \subsection{Example}
 \label{sec34}
@@ -302,27 +303,28 @@ For example, the first simulation pattern is ``01100''.
   \subfigcapskip=-5pt %设置子图与子标题之间的距离
   \subfigure[example logic circuit]{
       \label{fig:sim1}
-      \includegraphics[width=0.3\textwidth]{picture/sim1.pdf}}
+      \includegraphics[width=0.29\textwidth]{picture/sim1.pdf}}
       \hspace{15mm}
   \subfigure[cutting algorithm]{
       \label{fig:sim2}
-      \includegraphics[width=0.3\textwidth]{picture/sim2.pdf}}
+      \includegraphics[width=0.29\textwidth]{picture/sim2.pdf}}
   \caption{Illustration of STP-based simulation}
   \label{fig:sim}
   \vspace{-2mm}
 \end{figure}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-Next we simulate and only get the simulation signature of POs.
-Firstly, we must identify multiple fan-out nodes; in this context, nodes ``7'' and ``8'' fall under this category.
-Secondly, we need to find the cut that satisfies the leaf node restriction. 
+If there are two specific nodes, nodes ``7'' and ``8'' fall under this category.
+We simulate and only get the simulation signature of these two nodes.
+Firstly, we need to find the cut that satisfies the leaf node restriction. 
 Since $3 < log_2^{10} < 4$, we set a limit of 3, meaning that each cut's input count should not exceed 3.
 After cutting, we derive four distinct cuts: (6,10), (7), (8), and (9,11). 
 For each cut, we proceed to compute its TT, as illustrated in Fig.~\ref{fig:sim2}.
 Finally, all nodes of the root set are sorted according to the inverse topology order of the graph. 
 We sequentially traverse and simulate each node within this sorted root set, ultimately leading to the acquisition of simulation signatures.
-As an example, node ``7'' has two inputs, namely ``3'' and ``4''.
-By combining patterns of inputs with the TT of node ``7'' (0111), we successfully compute the simulation signature of node ``7'' as follows: 7: 1111100111.
+As an example, nodes ``7'' and ``8'' contain three PIs, namely ``2'', ``3'', and ``4''.
+The scale of exhaustive patterns of node ``7'' and ``8'' is $2^2=4$, $2^3=8$, that is less than original 10 patterns.
+By combining exhaustive patterns of PIs with the TT of node ``7'' (0111) and ``8'' (0111), the TT of node ``7'' and ``8'' can be simulated as follows: 7: 1110, 8: 11110001.
 
 \vspace{-2mm}
 \section{STP-based SAT-sweeping framework}
@@ -412,13 +414,12 @@ When the SAT problem is satisfied, new assignments will be generated at the PIs 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \vspace{-4mm}
 
-Moreover, CE-based simulation has been employed for the purpose of refining candidate equivalence classes. 
+CE simulation has been employed for the purpose of refining candidate equivalence classes. 
 However, due to the impractical time demands of simulations, they often rely on partial simulation patterns.
 To further enhance the refinement of candidate equivalence classes, STP-based simulation exclusively visits nodes belonging to the same equivalence class. 
 For instance, if an equivalence class comprises only two nodes, ``A'' and ``B'', we map the remaining nodes into $k$-LUTs, and then simulate the values of ``A'' and ``B'' to disprove their equivalence.
-Furthermore, during the simulation of each CE, we transform nodes not within equivalence classes into $k$-LUTs. 
-We then employ the values assigned to candidate nodes to refine the equivalence classes. 
-In contrast to traditional simulations, STP-based simulations adopt exhaustive simulation patterns, propagating one pattern at a time.
+Furthermore, during the simulation of each CE, we first convert nodes not within equivalence classes into $k$-LUTs, and then simulate candidate nodes to refine the equivalence classes. 
+In contrast to traditional simulations, STP-based simulations adopt exhaustive simulation patterns, if the simulation is restricted to a window encompassing fewer than 16 leaf nodes.
 In terms of practical implementation, the ID of the equivalence class is stored as an integer array within the \emph{equivalence class manager}.
 This information is utilized by the STP-based simulator to exclusively simulate nodes belonging to the same equivalence class, while the remainder are mapped to $k$-LUTs.
 
@@ -432,7 +433,7 @@ All experiments are performed on a 3.20 GHz Apple M1 CPU with 8GB of main memory
 \subsection{Simulation}
 \label{sec61}
 First, we evaluate the efficiency of our proposed STP-based simulator on the EPFL benchmarks suite\footnote{EPFL benchmark suite, https://github.com/lsils/benchmarks} by command `\texttt{simulator}' in ALSO.
-We compare our proposed simulator (\emph{STP}) with the logic circuit simulation (\emph{Mockturtle}~\cite{exp0}) with exhaustive patterns.
+We compare our proposed simulator (\emph{STP}) with the logic circuit simulation (\emph{Mockturtle}~\cite{exp0}).
 Each benchmark is simulated with randomly generated $10^6$ simulation patterns.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{table}[h]
@@ -541,12 +542,12 @@ All results are veriﬁed by `\texttt{\&cec}' command in ABC to ensure functiona
 As shown in Table~\ref{tab2}, we present the number of PIs and POs, internal AND-nodes in the original AIG (Gate), logic levels (Lev), and the internal AND-nodes after SAT-sweeping (Result) in the ``Statistics'' section.
 Notably, the number of Result (9\% improvement of Gate) remains consistent across both engines since they start from the same AIG, with the SAT solver conflict limit disabled in all runs.
 In ``SAT calls'' and ``Total SAT calls'' sections, we detail the number of satisfiable SAT calls and Total SAT calls, respectively.
-We reduced the number of satisfiable SAT calls by using fast $k$-LUT based exhaustive simulations, thereby reducing the number of SAT solver calls and accelerating runtime.
+We reduced the number of unsatisfiable SAT calls by using fast $k$-LUT based exhaustive simulations, thereby reducing the number of satisfiable solver calls by efficient equivalence class candidates.
 Section ``Simulation'' shows the runtime for simulation, primarily encompasses initial simulation and CE simulation.
 Lastly, the ``Total runtime'' section provides a direct comparison of the SAT sweeper's overall runtime, revealing a substantial 35\% reduction when compared to \emph{\&fraig}. 
 While \emph{\&fraig} invests runtime resources in high-quality initial simulation, our method combines this with an exhaustive CE simulation. 
 We exhibit a 1.42$\times$ increase in simulation time, However, this is offset by a remarkable 91\% reduction in the number of SAT calls.
-This hybrid approach not only improves the quality of simulation patterns but also dramatically reduces the number of satisfiable SAT calls, ultimately resulting in highly efficient CE-based simulations.
+This hybrid approach not only improves the quality of simulation patterns but also dramatically reduces the number of SAT calls, ultimately resulting in highly efficient CE simulations.
 
 \vspace{-2mm}
 \section{Conclusion}
