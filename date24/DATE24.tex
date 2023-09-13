@@ -34,11 +34,11 @@
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \begin{document}
 
-\title{SSS: A \underline{S}emi-Tensor Product based Circuit \underline{S}imulation for \underline{S}AT-sweeping
-% \thanks{This work was supported by the National Natural Science Foundation of China under Grants 62274100 and 61871242.}
-}
-% \author{\IEEEauthorblockN{Hongyang Pan, Ruibing Zhang, Yinshui Xia, Lunyao Wang, and Zhufei Chu\IEEEauthorrefmark{1}}
-% \IEEEauthorblockA{Faculty of Electrical Engineering \& Computer Science, Ningbo University, Ningbo, China\\ \IEEEauthorrefmark{1}Email: chuzhufei@nbu.edu.cn}}
+\title{SSS: A \underline{S}emi-Tensor Product based Circuit \underline{S}imulation for \underline{S}AT-sweeping}
+% \thanks{*Corresponding authors: chuzhufei@nbu.edu.cn, yangfan@fudan.edu.cn}
+% \author{\IEEEauthorblockN{Hongyang Pan$^{1}$, Ruibing Zhang$^{2}$, Yinshui Xia$^{2}$, Lunyao Wang$^{2}$, Zhufei Chu$^{2}$$^{\ast}$, Fan Yang$^{1}$$^{\ast}$, and Xuan Zeng$^{1}$}
+% $^{1}$State Key Lab of ASIC \& System, School of Microelectronics, Fudan University, Shanghai, China\\ 
+% $^{2}$Faculty of Electrical Engineering \& Computer Science, Ningbo University, Ningbo, China}
 \maketitle
 \vspace{-10em}
 
@@ -48,11 +48,11 @@ Circuit simulation can generate highly expressive simulation patterns that can e
 Subsequently, SAT solvers are employed to check those that remain, thereby making the logic synthesis process more efficient.
 This paper introduces a novel circuit simulator of $k$-input lookup table ($k$-LUT) networks, based on semi-tensor product (STP).
 STP-based simulators use computation of logic matrices, the primitives of logic networks, as opposed to relying on bitwise logic operations for simulation of $k$-LUT networks.
-Experimental results show that our STP-based simulator reduces the runtime by an average of 3.9$\times$.
+Experimental results show that our STP-based simulator reduces the runtime by an average of 7.2$\times$.
 Furthermore, we integrate this proposed simulator into a SAT-sweeping engine known as SAT sweeper.
 Through a combination of structural hashing, simulation, and SAT queries, SAT sweeper simplifies logic networks by systematically merging graph vertices from input to output.
 To enhance the efficiency, we used STP-based exhaustive simulation, which significantly reduces the number of false equivalence class candidates, thereby improving the computational efficiency by reducing the number of SAT calls required.
-When compared to the SOTA SAT sweeper, our method demonstrates an average runtime reduction of 6.7$\times$.
+When compared to the SOTA SAT sweeper, our method demonstrates an average 35\% runtime reduction.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -72,7 +72,7 @@ There are many applications that take advantage of this integration, such as SAT
 In SAT-sweeping, the simulator can pregenerate a set of simulation patterns for a given Boolean network, most non-equivalence can be effectively eliminated by simply comparing simulation signatures.
 After each satisfiable SAT call, it also simulates each CE immediately in order to disprove as many properties as possible~\cite{intro3,intro4,intro2}.
 
-The efficacy of simulation, encompassing both initial simulation and CE simulation, plays an important role in SAT-sweeping, with the principal aim of minimizing the number of expensive NP-hard SAT solver calls.
+The efficiency of simulation, encompassing both initial simulation and CE simulation, plays an important role in SAT-sweeping, with the principal aim of minimizing the number of expensive NP-hard SAT solver calls.
 Certain algorithms incorporate partial simulation as a strategy to expedite simulation speed. 
 However, in scenarios where the pattern set is insufficiently expressive, the equivalence classes tend to enlarge, and the refinement via CE may become computationally more expensive.
 In practice, the equivalence class usually contains a few percent of the total gates in a valid merge.
@@ -87,10 +87,10 @@ As primitives in the logic network, logic matrices, which convert logical reason
 Motivated by this reasoning, we integrate our STP-based simulator into the SAT-sweeping engine, where efforts are made in order to run as many simulations as possible within the given runtime budget, reducing equivalence classes to avoid unnecessary SAT solver calls.
 
 The main contributions are: (1) a more efficient simulator: compared with other bitwise logic operation based simulation implementations, the STP-based simulator does not require specific logic operators, and the output values of any node can be computed by one matrix pass; 
-(2) The integration of STP-based simulator into SAT sweeper \emph{\&fraig}: we first use SAT-guidance initial simulations to refine equivalence classes while adding the constant node substitution, which can significantly reduce the number of false candidates for merging~\cite{intro7}.
+(2) the integration of STP-based simulator into SAT sweeper \emph{\&fraig}: we first use SAT-guidance initial simulations to refine equivalence classes while adding the constant node substitution, which can significantly reduce the number of false candidates for merging~\cite{intro7}.
 Then, map the nodes of non-equivalence classes to $k$-LUTs and simulate the nodes of equivalence classes with more simulation pattern to further refine candidate equivalence classes.
 In addition, for the candidate gates to be validated in each valid merge, we consider its \emph{transitive fanin} (TFI) to explore the maximum QoR.
-Experimental results show that the simulator can reduce the runtime by 3.95$\times$ on average, and the SAT sweeper can reduce the runtime by 6.7$\times$ on average.
+Experimental results show that the simulator can reduce the runtime by 7.18$\times$ on average, and the SAT sweeper can reduce the runtime by 35\% on average.
 
 \vspace{-2mm}
 \section{Preliminaries}
@@ -213,7 +213,7 @@ The STP form $\Phi(a, b, c)$ can be computed, i.e., simulated as
 
 \subsection{SAT-sweeping}
 \label{sec23}
-SAT-sweeping is an engine that detects, proves, and merges (or collects) functionally equivalent nodes (up to complementation). 
+SAT-sweeping is used to detect, prove, and merge (or collect) functionally equivalent nodes (up to complementation). 
 In SAT-sweeping, two nodes are checked if they can be merged using SAT~\cite{pri4,sweep2}. 
 SAT solvers provide a CE in the event the nodes cannot be merged, which is an input assignment that allows the two gates to be simulated to have different values.
 A traditional implementation of SAT-sweeping would test all possible pairs of nodes.
@@ -250,7 +250,7 @@ Finally, each cut node in the root collection is accessed in topological order a
 The algorithm returns the desired simulation signatures.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{algorithm}[t]
+\begin{algorithm}[t]\footnotesize
   \SetAlgoLined
   \LinesNumbered %要求显示行号
   \caption{STP-based circuit simulation}
@@ -302,11 +302,11 @@ For example, the first simulation pattern is ``01100''.
   \subfigcapskip=-5pt %设置子图与子标题之间的距离
   \subfigure[example logic circuit]{
       \label{fig:sim1}
-      \includegraphics[width=0.25\textwidth]{picture/sim1.pdf}}
+      \includegraphics[width=0.3\textwidth]{picture/sim1.pdf}}
       \hspace{15mm}
   \subfigure[cutting algorithm]{
       \label{fig:sim2}
-      \includegraphics[width=0.25\textwidth]{picture/sim2.pdf}}
+      \includegraphics[width=0.3\textwidth]{picture/sim2.pdf}}
   \caption{Illustration of STP-based simulation}
   \label{fig:sim}
   \vspace{-2mm}
@@ -328,7 +328,7 @@ By combining patterns of inputs with the TT of node ``7'' (0111), we successfull
 \section{STP-based SAT-sweeping framework}
 \label{sec4}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\begin{algorithm}[t]
+\begin{algorithm}[t]\footnotesize
   \SetAlgoLined
   \LinesNumbered %要求显示行号
   \caption{STP-based SAT-sweeping algorithm}
@@ -431,12 +431,13 @@ All experiments are performed on a 3.20 GHz Apple M1 CPU with 8GB of main memory
 
 \subsection{Simulation}
 \label{sec61}
-First, we evaluate the efficiency of our proposed STP-based simulator on the EPFL benchmarks suite\footnote{EPFL benchmark suite, https://github.com/lsils/benchmarks} by command `\texttt{sim}' in ALSO.
-We compare our proposed simulator (\emph{STP}) with the logic circuit simulation (\emph{Mockturtle}~\cite{exp0}).
+First, we evaluate the efficiency of our proposed STP-based simulator on the EPFL benchmarks suite\footnote{EPFL benchmark suite, https://github.com/lsils/benchmarks} by command `\texttt{simulator}' in ALSO.
+We compare our proposed simulator (\emph{STP}) with the logic circuit simulation (\emph{Mockturtle}~\cite{exp0}) with exhaustive patterns.
 Each benchmark is simulated with randomly generated $10^6$ simulation patterns.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{table}[h]
 	\centering
+    \fontsize{8}{10}\selectfont
 	\caption{Circuit simulation results for EPFL benchmarks.}
   \label{tab1}
 	\begin{tabular*}{\hsize}{@{}@{\extracolsep{\fill}}lrrrrrr@{}}
@@ -445,29 +446,29 @@ Each benchmark is simulated with randomly generated $10^6$ simulation patterns.
     \cmidrule(l){2-3} \cmidrule(l){4-7}
     & $T_A$(s) & $T_L$(s) & $T_A$(s) & \texttt{x} & $T_L$(s) & \texttt{x} \cr
     \midrule
-    adder      & 2.42  & 2.68  & 2.22  & 1.09  & 0.61  & 4.39   \\ 
-    bar        & 6.52  & 13.91  & 6.86  & 0.95  & 3.04  & 4.58   \\ 
-    div        & 119.25  & 180.56  & 114.41  & 1.04  & 41.79  & 4.32   \\ 
-    hyp        & 427.01  & 667.61  & 429.67  & 0.99  & 181.49  & 3.68   \\ 
-    log2       & 61.63  & 109.89  & 63.59  & 0.97  & 27.99  & 3.93   \\ 
-    max        & 6.36  & 10.88  & 5.90  & 1.08  & 2.28  & {\bf 4.77}   \\ 
-    multiplier & 52.73  & 94.32  & 54.11  & 0.97  & 22.36  & 4.22   \\ 
-    sin        & 10.43  & 18.85  & 10.80  & 0.97  & 4.35  & 4.33   \\ 
-    sqrt       & 49.34  & 81.35  & 49.01  & 1.01  & 18.45  & 4.41   \\ 
-    square     & 36.39  & 63.37  & 36.96  & 0.98  & 15.07  & 4.21   \\ 
-    voter      & 29.19  & 41.61  & 27.38  & 1.07  & 10.39  & 4.00   \\ 
-    router     & 0.58  & 1.06  & 0.51  & 1.14  & 0.29  & 3.66   \\ 
-    priority   & 2.15  & 4.42  & 1.96  & 1.10  & 1.24  & 3.56   \\ 
-    mem\_ctrl  & 92.87  & 203.26  & 95.08  & 0.98  & 54.79  & 3.71   \\ 
-    int2float  & 0.51  & 1.06  & 0.52  & 0.98  & 0.26  & 4.08   \\ 
-    i2c        & 2.78  & 5.65  & 2.89  & 0.96  & 1.48  & 3.82   \\ 
-    dec        & 0.52  & 1.54  & 1.01  & 0.51  & 0.54  & 2.85   \\ 
-    ctrl       & 0.35  & 0.61  & 0.38  & 0.92  & 0.17  & 3.59   \\ 
-    cavlc      & 1.36  & 3.04  & 1.39  & 0.98  & 0.78  & 3.90   \\ 
-    arbiter    & 22.70  & 47.41  & 23.66  & 0.96  & 13.31  & 3.56   \\ 
+    adder & 1.33  & 12.56  & 1.36  & 0.98  & 0.57  & {\bf 22.04}   \\ 
+    bar & 3.65  & 17.61  & 2.87  & 1.27  & 1.65  & 10.67   \\ 
+    div & 65.12  & 414.92  & 69.04  & 0.94  & 56.30  & 7.37   \\ 
+    hyp & 236.61  & 1,066.65  & 291.85  & 0.81  & 134.90  & 7.91   \\ 
+    log2 & 35.30  & 181.67  & 36.01  & 0.98  & 45.17  & 4.02   \\ 
+    max & 3.58  & 33.96  & 2.94  & 1.22  & 5.05  & 6.73   \\ 
+    multiplier & 29.89  & 149.81  & 31.20  & 0.96  & 23.72  & 6.32   \\ 
+    sin & 5.89  & 31.37  & 6.16  & 0.96  & 7.01  & 4.47   \\ 
+    sqrt & 28.21  & 154.44  & 22.03  & 1.28  & 20.68  & 7.47   \\ 
+    square & 20.42  & 88.91  & 24.26  & 0.84  & 11.34  & 7.84   \\ 
+    artbiter & 12.91  & 67.43  & 14.99  & 0.86  & 21.02  & 3.21   \\ 
+    cavlc & 0.77  & 3.09  & 0.81  & 0.95  & 0.53  & 5.83   \\ 
+    ctrl & 0.21  & 0.77  & 0.17  & 1.24  & 0.09  & 8.58   \\ 
+    dec & 0.28  & 4.98  & 0.62  & 0.45  & 0.90  & 5.54   \\ 
+    i2c & 1.61  & 11.58  & 1.45  & 1.11  & 1.55  & 7.47   \\ 
+    int2float & 0.28  & 1.47  & 0.28  & 1.00  & 0.18  & 8.19   \\ 
+    mem\_ctrl & 52.21  & 312.26  & 49.74  & 1.05  & 54.02  & 5.78   \\ 
+    priority & 1.19  & 10.03  & 0.95  & 1.26  & 1.17  & 8.58   \\ 
+    router & 0.35  & 3.02  & 0.33  & 1.06  & 0.41  & 7.36   \\ 
+    voter & 16.28  & 92.69  & 15.99  & 1.02  & 8.55  & 10.84  \\ 
   \midrule
-  {\bf Geo.}&8.83  &{\bf 16.22}   &9.09  &     &{\bf 4.10}  &      \\ 
-  {\bf Imp.}   &1.0   &1.0    &0.97  &     &{\bf 3.95}&   \\ 
+  {\bf Geo.}& 4.99  & 30.44  & 5.04  & ~ & 4.24  &   \\ 
+  {\bf Imp.}& 1.0   & 1.0    & {\bf 0.99}  & ~ & {\bf 7.18}  & ~ \\ 
   \bottomrule
 	\end{tabular*}
   \begin{tablenotes}
@@ -479,31 +480,34 @@ Each benchmark is simulated with randomly generated $10^6$ simulation patterns.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \begin{table*}[t]
   \centering
-  \fontsize{9}{10}\selectfont
+  \fontsize{8}{10}\selectfont
   \begin{threeparttable}
   \caption{Comparing the number of SAT calls and the runtime of the SAT sweepers (runtime in seconds)}
   \label{tab2}
-  \begin{tabular*}{\hsize}{@{}@{\extracolsep{\fill}}lcrrrrrrrrrr@{}}
+  \begin{tabular*}{\hsize}{@{}@{\extracolsep{\fill}}lcrrrrrrrrrrrr@{}}
   \toprule
-  \multirow{2}{*}{Benchmark} & \multicolumn{4}{c}{Statistics} & \multicolumn{2}{c}{SAT calls} & \multicolumn{2}{c}{Simulation} & \multicolumn{3}{c}{Total runtime} \cr
-  \cmidrule(l){2-5} \cmidrule(l){6-7} \cmidrule(l){8-9} \cmidrule(l){10-12} 
-  & PI/PO & Gate & Lev & Result & \&fraig & STP & \&fraig & STP & \&fraig & STP & \texttt{x}  \\ 
+  \multirow{2}{*}{Benchmark} & \multicolumn{4}{c}{Statistics} & \multicolumn{2}{c}{SAT calls} & \multicolumn{2}{c}{Total SAT calls} & \multicolumn{2}{c}{Simulation} & \multicolumn{3}{c}{Total runtime} \cr
+  \cmidrule(l){2-5} \cmidrule(l){6-7} \cmidrule(l){8-9} \cmidrule(l){10-11} \cmidrule(l){12-14} 
+  & PI/PO &Lev & Gate  & Result & \&fraig & STP & \&fraig & STP& \&fraig & STP & \&fraig & STP & \texttt{x}  \\ 
   \midrule
-  6s100 & 127138/97599 & 636637  & 79  & 627550  & 2400  & 160  & 0.30  & 0.84  & 1.73  & 1.67  & 1.03   \\ 
-  6s20 & 250/202 & 30251  & 2828  & 12741  & 791  & 45  & 0.08  & 0.15  & 33.35  & 24.80  & 1.34   \\ 
-  6s281b35 & 268334/177236 & 2076248  & 121  & 2058408  & 10908  & 779  & 2.69  & 8.07  & 6.84  & 2.87  & 2.38   \\ 
-  6s299b685 & 719410/467370 & 4111296  & 75  & 3809686  & 943  & 99  & 4.78  & 12.75  & 20.56  & 3.48  & 5.90   \\ 
-  6s350rb35 & 245680/243400 & 1550409  & 194  & 1545664  & 106  & 30  & 0.88  & 0.88  & 2.21  & 0.08  & 29.00   \\ 
-  6s382r & 106395/104831 & 1756654  & 2752  & 1704409  & 1158  & 106  & 1.87  & 5.24  & 86.36  & 28.92  & 2.99   \\ 
-  beemfwt4b1 & 3851/1595 & 47368  & 1212  & 41580  & 1009  & 45  & 0.28  & 2.80  & 16.28  & 1.66  & 9.83   \\ 
-  beemfwt5b3 & 7370/3047 & 104771  & 2235  & 90611  & 3303  & 1652  & 1.63  & 1.63  & 37.25  & 2.19  & 17.00   \\ 
-  bobsyntheric2 & 400/201 & 19824  & 4762  & 10776  & 243  & 16  & 0.09  & 0.09  & 11.49  & 0.15  & 79.00   \\ 
-  oski15a07b0s & 8640/4454 & 120268  & 3822  & 118728  & 3812  & 332  & 2.47  & 0.04  & 17.06  & 0.57  & 29.75   \\ 
-  oski2b1i & 26489/13254  & 176605  & 12340  & 176553  & 12073  & 2656  & 10.90  & 27.25  & 105.72  & 17.89  & 5.91   \\ 
-  pj2002 & 2418/1176 & 34333  & 701  & 20526  & 102  & 9  & 0.05  & 0.13  & 6.39  & 2.57  & 2.49  \\ 
+  6s100        & 127138/97599  & 79      & 636,637    & 627,550   & 2,400   & 160    & 10,085  & 7,845  & 0.30   & 0.63  & 1.73    & 1.35   & 0.78   \\ 
+  6s20         & 250/202       & 2,828   & 30,251     & 12,741    & 791     & 45     & 5,613   & 4,867  & 0.08   & 0.20  & 33.35   & 28.92  & 0.87   \\ 
+  6s203b41     & 80192/68958   & 65      & 474,322    & 463,531   & 213     & 15     & 5,535   & 5,337  & 0.22   & 0.43  & 1.11    & 1.07   & 0.96   \\ 
+  6s281b35     & 268334/177236 & 121     & 2,076,248  & 2,058,408 & 10,908  & 1,148  & 17,308  & 7,548  & 2.69   & 3.56  & 6.84    & 3.98   & 0.58   \\ 
+  6s342rb122   & 59253/56839   & 52      & 330,130    & 319,365   & 194     & 9      & 3,224   & 3,039  & 0.06   & 0.19  & 0.24    & 0.23   & 0.94   \\ 
+  6s350rb46    & 245680/243400 & 194     & 1,550,412  & 1,545,667 & 163     & 82     & 3,479   & 3,398  & 0.75   & 0.21  & 1.72    & 1.68   & 0.98   \\ 
+  6s382r       & 106395/104831 & 2,752   & 1,756,654  & 1,704,409 & 1,158   & 74     & 5,911   & 4,827  & 1.87   & 4.08  & 86.36   & 70.52  & 0.82   \\ 
+  6s392r       & 80920/80151   & 538     & 1,599,275  & 1,583,824 & 583     & 51     & 2,878   & 2,346  & 0.40   & 0.54  & 0.80    & 0.65   & 0.82   \\ 
+  beemfwt4b1   & 3851/1595     & 1,212   & 47,368     & 41,580    & 1,009   & 222    & 1,412   & 625    & 0.28   & 0.18  & 16.28   & 7.21   & 0.44   \\ 
+  beemfwt5b3   & 7370/3047     & 2,235   & 104,771    & 90,611    & 3,303   & 302    & 3,745   & 744    & 1.63   & 2.48  & 37.25   & 7.40   & {\bf 0.20}   \\ 
+  oski15a07b0s & 8640/4454     & 3,822   & 120,268    & 118,728   & 3,812   & 953    & 4,073   & 1,214  & 2.47   & 1.38  & 17.06   & 5.08   & 0.30   \\ 
+  oski2b1i     & 26489/13254   & 12,340  & 176,605    & 176,553   & 12,073  & 4,829  & 12,125  & 4,881  & 10.90  & 3.80  & 105.72  & 42.56  & 0.40   \\ 
+  b18          & 6630/3322     & 64      & 131,100    & 124,530   & 606     & 17     & 3,926   & 3,337  & 0.05   & 0.25  & 0.40    & 0.34   & 0.85   \\ 
+  b19          & 13235/6627    & 77      & 256,503    & 242,499   & 1,283   & 88     & 8,359   & 7,164  & 0.14   & 0.28  & 0.65    & 0.56   & 0.86   \\ 
+  leon2        & 298888/291880 & 58      & 789,647    & 787,972   & 1,977   & 92     & 2,898   & 1,013  & 1.55   & 4.63  & 5.11    & 4.79   & 0.94   \\ 
   \midrule
-  {\bf Geo.} & ~ & 237,477  &   & 194,246 & 1,202 & 127 & 0.74 & 1.12  & 14.95  & 2.20  &   \\ 
-  {\bf Imp.} & ~ & ~ & ~ & ~ & 1.0 & {\bf 0.11} & 1.0 & {\bf 1.50} & 1.0  & {\bf 0.15}  &   \\ 
+  {\bf Geo.} & ~ & ~ & 335,363  & 305,780  & 1,230  & 119  & 4,943  & 2,965  & 0.53  & 0.74  & 4.83  & 3.15  &   \\ 
+  {\bf Imp.} & ~ & ~ & 1.0  & {\bf 0.91}  & 1.0  & {\bf 0.09}  & 1.0  & {\bf 0.60}  & 1.00 & {\bf 1.42}  & 1.0  & {\bf 0.65}  & ~\\ 
   \bottomrule
   \end{tabular*}
   \begin{tablenotes}
@@ -515,12 +519,12 @@ Each benchmark is simulated with randomly generated $10^6$ simulation patterns.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 The experimental results, as summarized in Table~\ref{tab1}, provide valuable insights. 
-To facilitate comparison, we present the mean simulation time for both the \emph{And-Inverter Graph} (AIG), denoted as ``$T_A$'', and the $4$-LUT networks, denoted as ``$T_L$''. 
+To facilitate comparison, we present the mean simulation time for both the \emph{And-Inverter Graph} (AIG), denoted as ``$T_A$'', and the $6$-LUT networks, denoted as ``$T_L$''. 
 Additionally, we quantify the extent of CPU time acceleration as ``$\texttt{x}$''.
 To gauge algorithm efficiency, we utilize the geometric mean, denoted as ``{\bf Geo.}'', and the average geometric mean improvement of optimized simulation over initialization, expressed as ``{\bf Imp.}''. 
 It is evident that there is a preference for algorithms capable of achieving superior benchmark simulation times.
 In terms of ``$T_A$'', our method demonstrates runtime performance comparable to that of \emph{Mockturtle}, which highlights the effectiveness of our method in simulating common data structures.
-For ``$T_L$'', the \emph{STP} exhibits an average runtime improvement of 3.95$\times$ (4.77$\times$ maximum). 
+For ``$T_L$'', the \emph{STP} exhibits an average runtime improvement of 7.18$\times$ (22.04$\times$ maximum). 
 These findings underscore the enhanced performance of our proposed simulator in the context of $k$-LUT simulation.
 This advantage arises because \emph{Mockturtle} employs incremental simulation, which accelerates simulation by selectively re-simulating necessary nodes and re-computing only the last block of TT. 
 However, it currently lacks support for $k$-LUT simulation. 
@@ -528,19 +532,20 @@ In $k$-LUT simulation, most simulators are limited to extracting individual bits
 
 \subsection{SAT-sweeping}
 \label{sec62}
-We implemented our method to demonstrate the effectiveness of the STP-based SAT sweeper. 
-To ensure functional correctness, all results were verified using the `\texttt{\&cec}' command in ABC\footnote{Mishchenko A. ABC: System for sequential logic synthesis and formal verification. https://github.com/berkeley-abc/abc, 2022}. 
-Our experiments were conducted using a selected subset of benchmarks from the HWMCC'15~\cite{exp1} benchmark suites.
-The proposed SAT sweeper is based on existing engine, \emph{\&fraig} (command `\texttt{\&fraig -x}' in ABC). 
+We implemented our method to demonstrate the effectiveness of the proposed SAT sweeper. 
+Our experiments were conducted using a selected subset of benchmarks from the HWMCC'15~\cite{exp1} and IWLS'05\cite{exp2} benchmark suites.
+The proposed SAT sweeper is based on existing engine, \emph{\&fraig} (command `\texttt{\&fraig -x}' in ABC\footnote{Mishchenko A. ABC: System for sequential logic synthesis and formal verification. https://github.com/berkeley-abc/abc, 2022}). 
 As of our knowledge, \emph{\&fraig} represents the most efficient and scalable publicly available SAT sweeper.
+All results are veriﬁed by `\texttt{\&cec}' command in ABC to ensure functional correctness.
 
 As shown in Table~\ref{tab2}, we present the number of PIs and POs, internal AND-nodes in the original AIG (Gate), logic levels (Lev), and the internal AND-nodes after SAT-sweeping (Result) in the ``Statistics'' section.
-Notably, the number of Result remains consistent across both engines since they start from the same AIG, with the SAT solver conflict limit disabled in all runs.
-In ``SAT calls'' and ``Simulation'' sections, we detail the number of satisfiable calls and the respective simulation runtimes. 
-The runtime for simulation primarily encompasses initial simulation and CE-based simulation.
-Lastly, the ``Total runtime'' section provides a direct comparison of the SAT sweeper's overall runtime, revealing a substantial 6.7$\times$ reduction when compared to \emph{\&fraig}. 
-While \emph{\&fraig} invests runtime resources in high-quality initial simulation, our method combines high-quality initial simulations with a $k$-LUT based simulator. 
-We exhibit a 1.5$\times$ increase in simulation time, However, this is offset by a remarkable reduction of 9.1$\times$ in the number of SAT calls.
+Notably, the number of Result (9\% improvement of Gate) remains consistent across both engines since they start from the same AIG, with the SAT solver conflict limit disabled in all runs.
+In ``SAT calls'' and ``Total SAT calls'' sections, we detail the number of satisfiable SAT calls and Total SAT calls, respectively.
+We reduced the number of satisfiable SAT calls by using fast $k$-LUT based exhaustive simulations, thereby reducing the number of SAT solver calls and accelerating runtime.
+Section ``Simulation'' shows the runtime for simulation, primarily encompasses initial simulation and CE simulation.
+Lastly, the ``Total runtime'' section provides a direct comparison of the SAT sweeper's overall runtime, revealing a substantial 35\% reduction when compared to \emph{\&fraig}. 
+While \emph{\&fraig} invests runtime resources in high-quality initial simulation, our method combines this with an exhaustive CE simulation. 
+We exhibit a 1.42$\times$ increase in simulation time, However, this is offset by a remarkable 91\% reduction in the number of SAT calls.
 This hybrid approach not only improves the quality of simulation patterns but also dramatically reduces the number of satisfiable SAT calls, ultimately resulting in highly efficient CE-based simulations.
 
 \vspace{-2mm}
@@ -550,9 +555,9 @@ In this paper, we introduce a novel STP-based circuit simulation tailored for SA
 Simulating $k$-LUT networks can be particularly challenging for conventional fast bitwise simulators available off-the-shelf. 
 STP, however, provides advantages in the computation of logic matrices and circuit connectivity.
 The primary contribution of this paper lies in the introduction of cut algorithm that substantially enhances simulation speed and promotes efficient information reuse. 
-When compared to the SOTA simulator, our STP-based simulation demonstrates an average reduction in CPU time by an average of 3.95$\times$.
+When compared to the SOTA simulator, our STP-based simulation demonstrates an average reduction in CPU time by an average of 7.18$\times$.
 Moreover, our simulation approach is deeply integrated into the SAT sweeper, leading to substantial reductions in runtime for refining equivalence classes. 
-Consequently, the implemented SAT sweeping approach, on average, performs 6.7$\times$ faster, without compromising quality.
+Consequently, the implemented SAT sweeping approach, on average, performs 35\% reduction in runtimes, without compromising quality.
 
 \footnotesize
 \begin{thebibliography}{00}
@@ -572,6 +577,7 @@ Consequently, the implemented SAT sweeping approach, on average, performs 6.7$\t
     \bibitem{sweep3} Zhang H T, Jiang J H R, Mishchenko A. ``A circuit-based SAT solver for logic synthesis,'' in \emph{Proc.ICCAD}, 2021: 1-6.
     \bibitem{exp0} Siang-Yun  L. mockturtle: a head-only library for logic synthesis and logic optimization, https://github.com/lsils/mockturtle.
     \bibitem{exp1} HWMCC'15 benchmarks https://fmv.jku.at/hwmcc15/.
+    \bibitem{exp2} IWLS 2005 benchmarks https://iwls.org/iwls2005/benchmarks.html.
 \end{thebibliography}
 
 \end{document}
